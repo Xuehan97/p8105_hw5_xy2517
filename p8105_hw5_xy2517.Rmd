@@ -1,0 +1,86 @@
+---
+title: "p8105_hw5_xy2517"
+author: "Xuehan Yang"
+date: "2021/11/15"
+output: github_document
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+## Problem 1
+
+**Load the data of homicides in 50 large U.S. cities.**
+
+```{r, message=FALSE}
+homicides_df = read_csv(file = "./data/homicide-data.csv", na = c("", "Unknown"))
+```
+
+The raw data contained `r nrow(homicides_df)` homicides and the location of the killing, whether an arrest was made and, in most cases, basic demographic information about each victim. Specifically, there are `r ncol(homicides_df)` variables, including `r names(homicides_df)`.
+
+**Obtain the total number of homicides and the number of unsolved homicides by cities.**
+
+```{r}
+homicides_df =
+  homicides_df %>% 
+  mutate(
+    city_state = str_c(city,", ",state),
+    unsolved = case_when(disposition %in% c("Closed without arrest","Open/No arrest") ~ 1, TRUE ~ 0))
+
+homicides_city =
+  homicides_df %>% 
+  group_by(city_state) %>% 
+  summarise(
+    num_homicide = n(),
+    num_unsolved = sum(unsolved)
+  )
+
+head(homicides_city) %>% knitr::kable()
+```
+
+**Baltimore estimation**
+
+```{r}
+baltimore_df =
+  homicides_city %>% 
+  filter(city_state == "Baltimore, MD")
+
+test_result = prop.test(x = pull(baltimore_df, num_unsolved), n = pull(baltimore_df, num_homicide))
+```
+
+p_value is `r test_result %>% broom::tidy() %>% pull(estimate)`
+
+confidence interval is (`r test_result %>% broom::tidy() %>% pull(conf.low)`, `r test_result %>% broom::tidy() %>% pull(conf.high)`)
+
+**Iteration through whole cities**
+
+```{r, warning=FALSE}
+p_estimate_city =
+  homicides_city %>% 
+  mutate(
+    test = map2(.x = num_unsolved, .y = num_homicide, ~prop.test(x = .x, n = .y)),
+    tidy = map(test, broom::tidy)) %>% 
+  unnest(tidy) %>% 
+  select(city_state, estimate, starts_with("conf"))
+
+head(p_estimate_city) %>% knitr::kable()
+```
+
+**Create a plot that shows the estimates and CIs for each city**
+
+```{r}
+p_estimate_city %>% 
+  filter(city_state != "Tulsa, AL") %>% 
+  mutate(city_state = fct_reorder(city_state, estimate)) %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+As we can see from the plot, the estimate proportion of unsolved crime is different in different cities and Chicago has the highest estimate proportion.
+
+
+
