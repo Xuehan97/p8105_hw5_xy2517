@@ -137,4 +137,35 @@ In the first week, this is no obvious difference between control group and exper
 
 ## Problem 3
 
+```{r}
+library(tidyverse)
+
+set.seed(10)
+
+iris_with_missing = iris %>% 
+  map_df(~replace(.x, sample(1:150, 20), NA)) %>%
+  mutate(Species = as.character(Species))
+```
+
+**Write a function to fill in missing values**
+
+```{r}
+na_filler = function(x) {
+  if (is.numeric(x)) {
+    value = replace_na(x, round(mean(x, na.rm = TRUE), digits = 1))
+  } else if (is.character(x)) {
+    value = replace_na(x, "virginica")
+  }
+  
+  return(value)
+}
+```
+
+fill the NA values using map
+```{r}
+iris_without_missing = map(iris_with_missing, na_filler)
+```
+
+
+
 
